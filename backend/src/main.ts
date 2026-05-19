@@ -4,7 +4,6 @@ import { ConfigService } from '@nestjs/config';
 import helmet from 'helmet';
 import compression from 'compression';
 import { AppModule } from './app.module';
-import { resolve } from 'path';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -37,6 +36,16 @@ async function bootstrap() {
   const port = config.get<number>('port') || 3001;
   await app.listen(port, '0.0.0.0');
   logger.log(`Application running on http://0.0.0.0:${port}`);
+
+  // Graceful shutdown for Railway / Kubernetes
+  const signals = ['SIGTERM', 'SIGINT'];
+  for (const signal of signals) {
+    process.on(signal, async () => {
+      logger.log(`Received ${signal}, shutting down gracefully...`);
+      await app.close();
+      process.exit(0);
+    });
+  }
 }
 
 bootstrap();
