@@ -4,10 +4,10 @@ WORKDIR /app
 ARG NEXT_PUBLIC_API_URL
 ARG API_PROXY_TARGET
 
-COPY package*.json ./
+COPY frontend/package*.json ./
 RUN npm install
 
-COPY . .
+COPY frontend/ .
 RUN npm run build
 
 FROM node:24-alpine AS runner
