@@ -5,7 +5,11 @@ import { PrismaService } from '../prisma/prisma.service';
 export class ReportingService {
   constructor(private prisma: PrismaService) {}
 
-  async getDashboardStats(sessionId?: string, centerId?: string) {
+  async getDashboardStats(sessionId?: string, centerId?: string, user?: any) {
+    if (user?.role === 'CENTER_ADMIN' && user?.userCenters?.length) {
+      centerId = centerId || user.userCenters[0].centerId;
+    }
+
     const sessionWhere: any = {};
     if (sessionId) sessionWhere.id = sessionId;
 
@@ -76,10 +80,14 @@ export class ReportingService {
     sessionId?: string;
     centerId?: string;
     stateId?: string;
-  }) {
+  }, user?: any) {
+    let centerId = params.centerId;
+    if (user?.role === 'CENTER_ADMIN' && user?.userCenters?.length) {
+      centerId = centerId || user.userCenters[0].centerId;
+    }
     const where: any = {};
     if (params.sessionId) where.sessionId = params.sessionId;
-    if (params.centerId) where.centerId = params.centerId;
+    if (centerId) where.centerId = centerId;
     if (params.stateId) where.stateId = params.stateId;
 
     const [statusCounts, typeCounts, stateCounts, centerCounts] = await Promise.all([
@@ -116,9 +124,13 @@ export class ReportingService {
     };
   }
 
-  async getInventoryReport(params: { centerId?: string; sessionId?: string }) {
+  async getInventoryReport(params: { centerId?: string; sessionId?: string }, user?: any) {
+    let centerId = params.centerId;
+    if (user?.role === 'CENTER_ADMIN' && user?.userCenters?.length) {
+      centerId = centerId || user.userCenters[0].centerId;
+    }
     const where: any = {};
-    if (params.centerId) where.centerId = params.centerId;
+    if (centerId) where.centerId = centerId;
     if (params.sessionId) where.sessionId = params.sessionId;
 
     const [statusCounts, supplierCounts, costSummary, yieldSummary] = await Promise.all([
@@ -154,9 +166,13 @@ export class ReportingService {
     };
   }
 
-  async getGeographicReport(sessionId?: string) {
+  async getGeographicReport(sessionId?: string, centerId?: string, user?: any) {
+    if (user?.role === 'CENTER_ADMIN' && user?.userCenters?.length) {
+      centerId = centerId || user.userCenters[0].centerId;
+    }
     const where: any = {};
     if (sessionId) where.sessionId = sessionId;
+    if (centerId) where.centerId = centerId;
 
     const stateData = await this.prisma.beneficiary.groupBy({
       by: ['stateId'],

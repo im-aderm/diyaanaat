@@ -13,8 +13,9 @@ export class CreateCowDto {
   @IsUUID('4')
   sessionId: string;
 
+  @IsOptional()
   @IsString()
-  tagNumber: string;
+  tagNumber?: string;
 
   @IsOptional()
   @IsDateString()

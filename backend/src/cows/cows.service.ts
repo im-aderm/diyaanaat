@@ -1,8 +1,9 @@
 import {
-  Injectable, NotFoundException, ConflictException,
+  Injectable, NotFoundException, BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateCowDto, UpdateCowDto } from './dto/cow.dto';
+import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
 export class CowsService {
@@ -55,15 +56,40 @@ export class CowsService {
   }
 
   async create(dto: CreateCowDto) {
-    const existing = await this.prisma.cow.findUnique({ where: { tagNumber: dto.tagNumber } });
-    if (existing) throw new ConflictException('Cow with this tag number already exists');
+    const tagNumber = dto.tagNumber || `COW-${uuidv4().slice(0, 8).toUpperCase()}`;
 
-    return this.prisma.cow.create({ data: dto });
+    const maxRetries = 3;
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        return await this.prisma.cow.create({
+          data: {
+            centerId: dto.centerId,
+            supplierId: dto.supplierId,
+            sessionId: dto.sessionId,
+            tagNumber,
+            purchaseDate: dto.purchaseDate ? new Date(dto.purchaseDate) : undefined,
+            purchaseCost: dto.purchaseCost,
+            estimatedYield: dto.estimatedYield,
+            healthStatus: dto.healthStatus,
+            notes: dto.notes,
+          },
+        });
+      } catch (error: any) {
+        if (error?.code === 'P2002' && attempt < maxRetries - 1) {
+          continue;
+        }
+        throw error;
+      }
+    }
+
+    throw new BadRequestException('Failed to create cow after retries');
   }
 
   async update(id: string, dto: UpdateCowDto) {
     await this.findById(id);
-    return this.prisma.cow.update({ where: { id }, data: dto });
+    const data: any = { ...dto };
+    if (dto.purchaseDate) data.purchaseDate = new Date(dto.purchaseDate);
+    return this.prisma.cow.update({ where: { id }, data });
   }
 
   async getInventoryStats(params: { centerId?: string; sessionId?: string }) {

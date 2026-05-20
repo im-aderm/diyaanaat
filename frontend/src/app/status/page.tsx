@@ -5,8 +5,8 @@ import Link from 'next/link';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
 import Badge from '@/components/ui/Badge';
-import Card from '@/components/ui/Card';
 import { api } from '@/lib/api';
+import { Search, CheckCircle, XCircle, Clock, ArrowLeft } from 'lucide-react';
 
 export default function StatusPage() {
   const [phone, setPhone] = useState('');
@@ -16,94 +16,125 @@ export default function StatusPage() {
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-    setError('');
-    setResult(null);
+    setLoading(true); setError(''); setResult(null);
     try {
-      const searchResult: any = await api.get(`/beneficiaries?search=${phone}&take=1`);
-      if (searchResult.data?.length > 0) {
-        setResult(searchResult.data[0]);
-      } else {
-        setError('No registration found with this phone number');
-      }
-    } catch {
-      setError('Could not check status. Please try again.');
-    } finally {
-      setLoading(false);
+      const searchResult: any = await api.get(`/beneficiaries?search=${encodeURIComponent(phone)}&take=1`);
+      if (searchResult.data?.length > 0) setResult(searchResult.data[0]);
+      else setError('No registration found with this phone number');
+    } catch { setError('Could not check status.'); } finally { setLoading(false); }
+  };
+
+  const statusConfig = (status: string) => {
+    switch (status) {
+      case 'APPROVED': return { bg: 'bg-tertiary-container/40', text: 'text-on-tertiary-container', icon: CheckCircle, label: 'Approved' };
+      case 'PENDING': return { bg: 'bg-yellow-100/80', text: 'text-yellow-800', icon: Clock, label: 'Pending Review' };
+      case 'REJECTED': return { bg: 'bg-error-container/40', text: 'text-on-error-container', icon: XCircle, label: 'Rejected' };
+      default: return { bg: 'bg-surface-container', text: 'text-on-surface-variant', icon: Clock, label: status };
     }
   };
 
-  const statusVariant = (status: string) => {
-    switch (status) {
-      case 'APPROVED': return 'success';
-      case 'PENDING': return 'warning';
-      case 'REJECTED': return 'danger';
-      default: return 'neutral';
-    }
-  };
+  const s = result ? statusConfig(result.status) : null;
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200">
-        <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2">
-            <img src="/logo.png" alt="Logo" className="h-7 w-auto" />
-            <span className="text-xl font-bold text-primary">Türkiye Diyanet Vakfı</span>
+    <div className="min-h-screen bg-surface">
+      <header className="bg-surface-container-lowest border-b border-outline-variant">
+        <div className="max-w-4xl mx-auto px-4 py-4">
+          <Link href="/" className="inline-flex items-center gap-2 text-on-surface-variant hover:text-primary transition-colors">
+            <ArrowLeft className="w-4 h-4" />
+            <img src="/logo.png" alt="Logo" className="h-6 w-auto" />
           </Link>
         </div>
       </header>
 
-      <main className="max-w-md mx-auto px-4 py-12">
-        <h2 className="text-xl font-bold text-center mb-6">Check Registration Status</h2>
+      <main className="max-w-md mx-auto px-4 py-16">
+        <div className="text-center mb-8">
+          <h1 className="text-2xl font-bold text-on-surface">Check Application Status</h1>
+          <p className="text-sm text-on-surface-variant mt-2">Enter your phone number or application code to track your application</p>
+        </div>
 
-        <Card>
+        <div className="bg-surface-container-lowest rounded-2xl border border-outline-variant shadow-sm p-6">
           <form onSubmit={handleSearch} className="space-y-4">
-            <Input
-              label="Registered Phone Number"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="Enter your phone number"
-              type="tel"
-              required
-            />
-            <Button type="submit" loading={loading} className="w-full">Check Status</Button>
+            <div className="relative">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-on-surface-variant" />
+              <Input
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="08012345678"
+                type="tel"
+                required
+                className="pl-10 py-3"
+              />
+            </div>
+            <Button type="submit" loading={loading} className="w-full py-3">
+              {loading ? 'Searching...' : 'Check Status'}
+            </Button>
           </form>
 
-          {error && <p className="text-red-600 text-sm mt-4 text-center">{error}</p>}
+          {error && (
+            <div className="mt-6 bg-error-container/40 text-on-error-container text-sm p-4 rounded-xl flex items-center gap-3">
+              <XCircle className="w-5 h-5 shrink-0" />
+              <span>{error}</span>
+            </div>
+          )}
 
-          {result && (
-            <div className="mt-6 space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-600">Status</span>
-                <Badge variant={statusVariant(result.status)}>{result.status}</Badge>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-600">Name</span>
-                <span className="font-medium">{result.fullName}</span>
-              </div>
-              {result.approvedSlots && (
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">Approved Slots</span>
-                  <span className="font-medium">{result.approvedSlots}</span>
+          {result && s && (
+            <div className="mt-6">
+              <div className={`rounded-xl ${s.bg} p-4 flex items-center gap-3 mb-4`}>
+                <div className="w-10 h-10 rounded-full bg-surface-container-lowest flex items-center justify-center shadow-sm">
+                  <s.icon className={`w-5 h-5 ${s.text}`} />
                 </div>
-              )}
+                <div>
+                  <p className={`text-sm font-semibold ${s.text}`}>{s.label}</p>
+                  <p className="text-xs text-on-surface-variant">Application Status</p>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex justify-between py-2 border-b border-outline-variant/50">
+                  <span className="text-sm text-on-surface-variant">Name</span>
+                  <span className="text-sm font-semibold text-on-surface">{result.fullName}</span>
+                </div>
+                <div className="flex justify-between py-2 border-b border-outline-variant/50">
+                  <span className="text-sm text-on-surface-variant">Phone</span>
+                  <span className="text-sm font-semibold text-on-surface">{result.phoneNumber}</span>
+                </div>
+                {result.approvedSlots && (
+                  <div className="flex justify-between py-2 border-b border-outline-variant/50">
+                    <span className="text-sm text-on-surface-variant">Approved Slots</span>
+                    <span className="text-sm font-semibold text-on-surface">{result.approvedSlots}</span>
+                  </div>
+                )}
+                {result.distributionDay && (
+                  <div className="flex justify-between py-2 border-b border-outline-variant/50">
+                    <span className="text-sm text-on-surface-variant">Collection</span>
+                    <span className="text-sm font-semibold text-on-surface">Day {result.distributionDay} at {result.distributionTime}</span>
+                  </div>
+                )}
+              </div>
+
               {result.uniqueCode && (
-                <div className="bg-emerald-50 rounded-lg p-4 text-center">
-                  <p className="text-sm text-emerald-700">Your Collection Code</p>
-                  <p className="text-xl font-mono font-bold text-emerald-800 mt-1">{result.uniqueCode}</p>
+                <div className="mt-4 bg-primary-container/10 border border-primary/20 rounded-xl p-5 text-center">
+                  <p className="text-xs font-semibold text-primary tracking-wider uppercase">Your Collection Code</p>
+                  <p className="text-2xl font-mono font-bold text-on-surface mt-2 tracking-wider">{result.uniqueCode}</p>
+                  <p className="text-xs text-on-surface-variant mt-2">Present this code at your assigned center on collection day</p>
                 </div>
               )}
-              {result.distributionDay && (
-                <div className="text-sm text-center text-gray-600">
-                  Collection: Day {result.distributionDay} at {result.distributionTime}
+
+              {result.center && (
+                <div className="mt-3 text-center text-xs text-on-surface-variant">
+                  Center: <span className="font-medium text-on-surface">{result.center.name}</span>
                 </div>
               )}
+
               {result.rejectionReason && (
-                <div className="bg-red-50 text-red-700 text-sm p-3 rounded-lg">{result.rejectionReason}</div>
+                <div className="mt-4 bg-error-container/30 text-on-error-container text-sm p-4 rounded-xl">
+                  <p className="font-semibold text-xs mb-1">Rejection Reason</p>
+                  <p>{result.rejectionReason}</p>
+                </div>
               )}
             </div>
           )}
-        </Card>
+        </div>
       </main>
     </div>
   );

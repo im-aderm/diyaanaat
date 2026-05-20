@@ -1,5 +1,5 @@
 import {
-  IsString, IsOptional, IsBoolean, IsArray, IsUUID,
+  IsString, IsOptional, IsBoolean, IsArray, IsUUID, IsEmail, MinLength,
 } from 'class-validator';
 
 export class CreateCenterDto {
@@ -24,6 +24,25 @@ export class CreateCenterDto {
   @IsArray()
   @IsUUID('4', { each: true })
   stateIds?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @IsUUID('4', { each: true })
+  adminIds?: string[];
+
+  @IsOptional()
+  @IsString()
+  adminEmail?: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(2)
+  adminName?: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(8)
+  adminPassword?: string;
 }
 
 export class UpdateCenterDto {

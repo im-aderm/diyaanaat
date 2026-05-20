@@ -2,6 +2,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || '/api/v1';
 
 class ApiClient {
   private token: string | null = null;
+  private refreshPromise: Promise<boolean> | null = null;
 
   constructor() {
     if (typeof window !== 'undefined') {
@@ -13,7 +14,10 @@ class ApiClient {
     this.token = token;
     if (typeof window !== 'undefined') {
       if (token) localStorage.setItem('accessToken', token);
-      else localStorage.removeItem('accessToken');
+      else {
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
+      }
     }
   }
 
@@ -46,7 +50,8 @@ class ApiClient {
             ...options,
             headers,
           });
-          const retryData = await retryResponse.json();
+          let retryData: any;
+          try { retryData = await retryResponse.json(); } catch { throw { status: retryResponse.status, message: 'Invalid response' }; }
           if (!retryResponse.ok) throw { status: retryResponse.status, ...retryData };
           return retryData.data || retryData;
         }
@@ -66,6 +71,19 @@ class ApiClient {
   }
 
   async refreshToken(): Promise<boolean> {
+    if (this.refreshPromise) {
+      return this.refreshPromise;
+    }
+
+    this.refreshPromise = this._doRefresh();
+    try {
+      return await this.refreshPromise;
+    } finally {
+      this.refreshPromise = null;
+    }
+  }
+
+  private async _doRefresh(): Promise<boolean> {
     const refreshToken = typeof window !== 'undefined' ? localStorage.getItem('refreshToken') : null;
     if (!refreshToken) return false;
 
@@ -116,11 +134,28 @@ class ApiClient {
       headers['Authorization'] = `Bearer ${this.token}`;
     }
 
-    const response = await fetch(`${API_URL}${endpoint}`, {
+    let response = await fetch(`${API_URL}${endpoint}`, {
       method: 'POST',
       headers,
       body: formData,
     });
+
+    if (response.status === 401) {
+      const refreshed = await this.refreshToken();
+      if (refreshed) {
+        headers['Authorization'] = `Bearer ${this.token}`;
+        response = await fetch(`${API_URL}${endpoint}`, {
+          method: 'POST',
+          headers,
+          body: formData,
+        });
+      } else {
+        this.setToken(null);
+        localStorage.removeItem('refreshToken');
+        if (typeof window !== 'undefined') window.location.href = '/login';
+        throw { status: 401, message: 'Unauthorized' };
+      }
+    }
 
     const data = await response.json();
     if (!response.ok) throw { status: response.status, ...data };

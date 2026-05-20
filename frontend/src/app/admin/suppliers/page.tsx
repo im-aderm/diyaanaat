@@ -6,6 +6,7 @@ import Card from '@/components/ui/Card';
 import Table from '@/components/ui/Table';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
+import Select from '@/components/ui/Select';
 import Modal from '@/components/ui/Modal';
 import Pagination from '@/components/ui/Pagination';
 import { Factory, Plus } from 'lucide-react';
@@ -16,6 +17,8 @@ export default function SuppliersPage() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ centerId: '', name: '', phone: '', address: '', notes: '' });
   const [formLoading, setFormLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [centers, setCenters] = useState<any[]>([]);
   const pageSize = 20;
 
   const fetchSuppliers = useCallback(async () => {
@@ -23,14 +26,17 @@ export default function SuppliersPage() {
     try { const params = new URLSearchParams({ skip: String((page - 1) * pageSize), take: String(pageSize) }); const result = await api.get<{ data: any[]; total: number }>(`/suppliers?${params}`); setSuppliers(result.data || []); setTotal(result.total || 0); } finally { setLoading(false); }
   }, [page]);
 
-  useEffect(() => { fetchSuppliers(); }, [fetchSuppliers]);
+  const fetchCenters = useCallback(async () => {
+    try { const c = await api.get<any[]>('/centers'); setCenters(c || []); } catch {}
+  }, []);
 
-  const handleCreate = async (e: React.FormEvent) => { e.preventDefault(); setFormLoading(true); try { await api.post('/suppliers', form); setShowForm(false); setForm({ centerId: '', name: '', phone: '', address: '', notes: '' }); fetchSuppliers(); } finally { setFormLoading(false); } };
+  useEffect(() => { fetchSuppliers(); fetchCenters(); }, [fetchSuppliers, fetchCenters]);
+
+  const handleCreate = async (e: React.FormEvent) => { e.preventDefault(); setFormLoading(true); try { await api.post('/suppliers', form); setShowForm(false); setForm({ centerId: '', name: '', phone: '', address: '', notes: '' }); fetchSuppliers(); } catch (err: any) { setError(err.message || 'Failed to create supplier'); } finally { setFormLoading(false); } };
 
   const columns = [
     { key: 'name', header: 'Supplier Name' }, { key: 'phone', header: 'Phone' }, { key: 'address', header: 'Address' },
     { key: 'center', header: 'Center', render: (s: any) => s.center?.name || '\u2014' },
-    { key: '_count', header: 'Cows', render: (s: any) => s._count?.cows || 0 },
   ];
 
   return (
@@ -39,12 +45,14 @@ export default function SuppliersPage() {
       <Card>{loading ? <div className="flex justify-center py-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div> : <><Table columns={columns} data={suppliers} /><Pagination page={page} total={total} pageSize={pageSize} onPageChange={setPage} /></>}</Card>
       <Modal open={showForm} onClose={() => setShowForm(false)} title="Add Supplier">
         <form onSubmit={handleCreate} className="space-y-4">
-          <Input label="Supplier Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
+          <Select label="Center *" value={form.centerId} onChange={(e) => setForm({ ...form, centerId: e.target.value })} required
+            options={[{ value: '', label: 'Select center...' }, ...centers.map((c: any) => ({ value: c.id, label: `${c.name} (${c.code})` }))]} />
+          <Input label="Supplier Name *" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
           <Input label="Phone" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
           <Input label="Address" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
-          <Input label="Center ID" value={form.centerId} onChange={(e) => setForm({ ...form, centerId: e.target.value })} required />
           <Input label="Notes" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
           <Button type="submit" loading={formLoading} className="w-full">Add Supplier</Button>
+          {error && <div className="bg-error-container text-on-error-container text-sm p-3 rounded-lg mt-3">{error}</div>}
         </form>
       </Modal>
     </div>

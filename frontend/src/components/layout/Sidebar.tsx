@@ -31,9 +31,8 @@ export default function Sidebar() {
   return (
     <aside className="w-64 bg-inverse-surface border-r border-outline-variant/20 h-screen sticky top-0 overflow-y-auto hidden lg:block">
       <div className="p-6">
-        <Link href="/admin/dashboard" className="flex items-center gap-3">
-          <img src="/logo.png" alt="Logo" className="h-7 w-auto" />
-          <span className="text-lg font-bold text-inverse-on-surface">Türkiye Diyanet Vakfı</span>
+        <Link href="/admin/dashboard" className="flex items-center">
+          <img src="/logo.png" alt="Türkiye Diyanet Foundation" className="h-9 w-auto" />
         </Link>
       </div>
       <nav className="px-3 pb-6">

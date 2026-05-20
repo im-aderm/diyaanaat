@@ -13,7 +13,7 @@ export default function MobileHeader() {
     <header className="lg:hidden sticky top-0 z-30 bg-surface border-b border-outline-variant">
       <div className="flex items-center justify-between px-4 h-14">
         <Link href="/admin/dashboard" className="flex items-center gap-2">
-          <img src="/logo.png" alt="Logo" className="h-6 w-auto" />
+          <img src="/logo.png" alt="Türkiye Diyanet Foundation" className="h-6 w-auto" />
           <span className="text-base font-bold text-on-surface">Türkiye Diyanet Vakfı</span>
         </Link>
         <button onClick={() => setOpen(!open)} className="text-on-surface-variant p-2">

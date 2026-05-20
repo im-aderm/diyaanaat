@@ -1,5 +1,7 @@
 import { api } from './api';
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1';
+
 export interface User {
   id: string;
   email: string;
@@ -31,6 +33,14 @@ export async function login(email: string, password: string): Promise<AuthRespon
 }
 
 export async function logout() {
+  const refreshToken = localStorage.getItem('refreshToken');
+  if (refreshToken) {
+    fetch(`${API_URL}/auth/logout`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken }),
+    }).catch(() => {});
+  }
   api.setToken(null);
   localStorage.removeItem('refreshToken');
   localStorage.removeItem('user');
@@ -38,12 +48,6 @@ export async function logout() {
 
 export async function getProfile(): Promise<User> {
   return api.get<User>('/auth/profile');
-}
-
-export function getStoredUser(): User | null {
-  if (typeof window === 'undefined') return null;
-  const stored = localStorage.getItem('user');
-  return stored ? JSON.parse(stored) : null;
 }
 
 export function storeUser(user: User) {

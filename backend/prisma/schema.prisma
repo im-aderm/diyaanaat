@@ -43,6 +43,12 @@ enum CowStatus {
   DISTRIBUTED
 }
 
+enum SmsLogStatus {
+  SENT
+  PENDING
+  FAILED
+}
+
 enum DistributionDay {
   DAY_10
   DAY_11
@@ -126,7 +132,7 @@ model CenterState {
   stateId   String   @db.Uuid
   createdAt DateTime @default(now())
 
-  center Center @relation(fields: [centerId], references: [id])
+  center Center @relation(fields: [centerId], references: [id], onDelete: Cascade)
   state  State  @relation(fields: [stateId], references: [id])
 
   @@unique([centerId, stateId])
@@ -158,8 +164,8 @@ model UserCenter {
   centerId  String   @db.Uuid
   createdAt DateTime @default(now())
 
-  user   User   @relation("UserCenters", fields: [userId], references: [id])
-  center Center @relation(fields: [centerId], references: [id])
+  user   User   @relation("UserCenters", fields: [userId], references: [id], onDelete: Cascade)
+  center Center @relation(fields: [centerId], references: [id], onDelete: Cascade)
 
   @@unique([userId, centerId])
   @@map("user_centers")
@@ -205,6 +211,10 @@ model Beneficiary {
   distributions Distribution[]
   smsLogs       SmsLog[]
 
+  @@index([status])
+  @@index([centerId])
+  @@index([sessionId])
+  @@index([phoneNumber])
   @@unique([phoneNumber, sessionId])
   @@unique([organizationName, sessionId])
   @@map("beneficiaries")
@@ -232,7 +242,7 @@ model SmsLog {
   phoneNumber   String
   message       String
   template      String?
-  status        String    @default("pending")
+  status        SmsLogStatus @default(PENDING)
   sentAt        DateTime?
   errorMessage  String?
   createdAt     DateTime  @default(now())
@@ -298,6 +308,7 @@ model Supplier {
   state  State? @relation(fields: [stateId], references: [id])
   cows   Cow[]
 
+  @@index([centerId])
   @@map("suppliers")
 }
 
@@ -306,7 +317,7 @@ model Cow {
   centerId         String    @db.Uuid
   supplierId       String    @db.Uuid
   sessionId        String    @db.Uuid
-  tagNumber        String    @unique
+  tagNumber        String?
   purchaseDate     DateTime?
   purchaseCost     Decimal?  @db.Decimal(12, 2)
   estimatedYield   Int?
@@ -320,6 +331,10 @@ model Cow {
   supplier Supplier @relation(fields: [supplierId], references: [id])
   session  Session  @relation(fields: [sessionId], references: [id])
 
+  @@index([centerId])
+  @@index([sessionId])
+  @@index([status])
+  @@index([supplierId])
   @@map("cows")
 }
 
@@ -342,6 +357,8 @@ model Distribution {
   session     Session     @relation(fields: [sessionId], references: [id])
   verifiedBy  User?       @relation(fields: [verifiedById], references: [id])
 
+  @@index([sessionId])
+  @@index([beneficiaryId])
   @@unique([code, sessionId])
   @@map("distributions")
 }

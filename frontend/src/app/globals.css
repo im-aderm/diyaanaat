@@ -72,26 +72,10 @@ body {
 }
 
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-
-::-webkit-scrollbar-track {
-  background: var(--color-surface-container);
-  border-radius: 3px;
-}
-
-::-webkit-scrollbar-thumb {
-  background: var(--color-outline-variant);
-  border-radius: 3px;
-  transition: background 0.2s;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: var(--color-outline);
+  width: 0;
+  height: 0;
 }
 
 * {
-  scrollbar-width: thin;
-  scrollbar-color: var(--color-outline-variant) var(--color-surface-container);
+  scrollbar-width: none;
 }

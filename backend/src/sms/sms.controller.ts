@@ -1,5 +1,5 @@
 import {
-  Controller, Get, Post, Patch, Param, Body, Query, UseGuards,
+  Controller, Get, Post, Body, Query, UseGuards,
 } from '@nestjs/common';
 import { SmsService } from './sms.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
@@ -35,5 +35,23 @@ export class SmsController {
   @Post('templates')
   updateTemplate(@Body('name') name: string, @Body('body') body: string) {
     return this.smsService.updateTemplate(name, body);
+  }
+
+  @Post('send')
+  sendManual(@Body() body: { phoneNumbers: string[]; message: string; beneficiaryIds?: string[]; sessionId?: string }) {
+    return this.smsService.sendManualMessage(body);
+  }
+
+  @Post('send-bulk')
+  sendBulk(
+    @Body() body: {
+      centerId?: string;
+      sessionId?: string;
+      status?: string;
+      message: string;
+      excludeCollected?: boolean;
+    },
+  ) {
+    return this.smsService.sendBulkMessage(body);
   }
 }

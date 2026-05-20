@@ -3,7 +3,8 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
-import { mkdirSync, existsSync, writeFileSync } from 'fs';
+import { mkdirSync, existsSync } from 'fs';
+import { promises as fs } from 'fs';
 import { join, extname } from 'path';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -35,7 +36,7 @@ export class UploadService {
   ) {
     this.validateFile(file);
 
-    const { relativePath, dirPath, filename } = this.saveFileToDisk(file, category, sessionYear);
+    const { relativePath, dirPath, filename } = await this.saveFileToDisk(file, category, sessionYear);
 
     if (beneficiaryId) {
       await this.prisma.beneficiaryDocument.create({
@@ -72,7 +73,7 @@ export class UploadService {
       const file = files[i];
       try {
         this.validateFile(file);
-        const { relativePath } = this.saveFileToDisk(file, category, sessionYear);
+        const { relativePath } = await this.saveFileToDisk(file, category, sessionYear);
 
         const doc = beneficiaryId
           ? await this.prisma.beneficiaryDocument.create({
@@ -135,7 +136,11 @@ export class UploadService {
     }
   }
 
-  private saveFileToDisk(file: Express.Multer.File, category: string, sessionYear?: string) {
+  private async saveFileToDisk(file: Express.Multer.File, category: string, sessionYear?: string) {
+    if (sessionYear && !/^\d{4}$/.test(String(sessionYear))) {
+      throw new BadRequestException('Invalid session year');
+    }
+
     const ext = extname(file.originalname);
     const filename = `${uuidv4()}${ext}`;
 
@@ -148,7 +153,7 @@ export class UploadService {
     }
 
     const filePath = join(dirPath, filename);
-    writeFileSync(filePath, file.buffer);
+    await fs.writeFile(filePath, file.buffer);
 
     const relativePath = sessionYear
       ? `uploads/${sessionYear}/${category}/${filename}`

@@ -13,6 +13,7 @@ export default function AuditPage() {
   const [logs, setLogs] = useState<any[]>([]); const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1); const [filter, setFilter] = useState({ action: '', entityType: '' });
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const pageSize = 50;
 
   const fetchLogs = useCallback(async () => {
@@ -23,6 +24,8 @@ export default function AuditPage() {
       if (filter.entityType) params.set('entityType', filter.entityType);
       const result = await api.get<{ data: any[]; total: number }>(`/audit?${params}`);
       setLogs(result.data || []); setTotal(result.total || 0);
+    } catch (err: any) {
+      setError(err.message || 'Failed to load audit logs');
     } finally { setLoading(false); }
   }, [page, filter]);
 
@@ -39,6 +42,7 @@ export default function AuditPage() {
   return (
     <div className="space-y-6">
       <div><h1 className="text-2xl font-bold text-on-surface">Audit Log</h1><p className="text-on-surface-variant text-sm">System audit trail and activity log</p></div>
+      {error && <div className="bg-error-container text-on-error-container text-sm p-3 rounded-lg">{error}</div>}
       <Card>
         <div className="flex gap-4 mb-4">
           <Select value={filter.action} onChange={(e) => { setFilter({ ...filter, action: e.target.value }); setPage(1); }}

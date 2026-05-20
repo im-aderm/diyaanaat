@@ -33,12 +33,15 @@ export default function BeneficiariesPage() {
   const [data, setData] = useState<Beneficiary[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
-  const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Beneficiary | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [rejectReason, setRejectReason] = useState('');
+  const [searchInput, setSearchInput] = useState('');
+  const [search, setSearch] = useState('');
   const pageSize = 20;
 
   const fetchData = useCallback(async () => {
@@ -49,19 +52,26 @@ export default function BeneficiariesPage() {
       if (statusFilter) params.set('status', statusFilter);
       const result = await api.get<{ data: Beneficiary[]; total: number }>(`/beneficiaries?${params}`);
       setData(result.data || []); setTotal(result.total || 0);
+    } catch (err: any) {
+      setError(err.message || 'Failed to load beneficiaries');
     } finally { setLoading(false); }
   }, [page, search, statusFilter]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
+  useEffect(() => {
+    const timer = setTimeout(() => setSearch(searchInput), 300);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
+
   const handleApprove = async (id: string, data: { approvedSlots: number; distributionDay: string; distributionTime: string }) => {
     setActionLoading(true);
-    try { await api.patch(`/beneficiaries/${id}/approve`, data); setModalOpen(false); setSelected(null); fetchData(); } finally { setActionLoading(false); }
+    try { await api.patch(`/beneficiaries/${id}/approve`, data); setModalOpen(false); setSelected(null); fetchData(); } catch (err: any) { setError(err.message || 'Action failed'); } finally { setActionLoading(false); }
   };
 
   const handleReject = async (id: string, reason: string) => {
     setActionLoading(true);
-    try { await api.patch(`/beneficiaries/${id}/reject`, { rejectionReason: reason }); setModalOpen(false); setSelected(null); fetchData(); } finally { setActionLoading(false); }
+    try { await api.patch(`/beneficiaries/${id}/reject`, { rejectionReason: reason }); setModalOpen(false); setSelected(null); fetchData(); } catch (err: any) { setError(err.message || 'Action failed'); } finally { setActionLoading(false); }
   };
 
   const columns = [
@@ -78,18 +88,19 @@ export default function BeneficiariesPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-on-surface">Beneficiaries</h1>
-        <p className="text-on-surface-variant text-sm">Manage and review beneficiary registrations</p>
+        <h1 className="text-2xl font-bold text-on-surface">Applications</h1>
+        <p className="text-on-surface-variant text-sm">Manage and review beneficiary applications</p>
       </div>
       <Card>
         <div className="flex flex-col md:flex-row gap-4 mb-4">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-on-surface-variant" />
-            <Input placeholder="Search by name, phone, or code..." value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} className="pl-9" />
+            <Input placeholder="Search by name, phone, or code..." value={searchInput} onChange={(e) => { setSearchInput(e.target.value); setPage(1); }} className="pl-9" />
           </div>
           <Select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
             options={[{ value: '', label: 'All Statuses' }, { value: 'PENDING', label: 'Pending' }, { value: 'APPROVED', label: 'Approved' }, { value: 'REJECTED', label: 'Rejected' }]} />
         </div>
+        {error && <div className="bg-error-container text-on-error-container text-sm p-3 rounded-lg mb-4">{error}</div>}
         {loading ? <div className="flex justify-center py-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div> : (
           <>
             <Table columns={columns} data={data} onRowClick={(b) => { setSelected(b as Beneficiary); setModalOpen(true); }} />
@@ -117,16 +128,22 @@ export default function BeneficiariesPage() {
               <div className="border-t border-outline-variant pt-4 mt-4">
                 <h4 className="font-semibold mb-3">Approve</h4>
                 <form onSubmit={(e) => { e.preventDefault(); const f = e.target as HTMLFormElement;
-                  handleApprove(selected.id, { approvedSlots: parseInt((f.elements.namedItem('approvedSlots') as HTMLInputElement).value),
-                    distributionDay: (f.elements.namedItem('distributionDay') as HTMLSelectElement).value,
-                    distributionTime: (f.elements.namedItem('distributionTime') as HTMLInputElement).value }); }} className="space-y-3">
+                  const slotsEl = f.elements.namedItem('approvedSlots') as HTMLInputElement;
+                  const dayEl = f.elements.namedItem('distributionDay') as HTMLSelectElement;
+                  const timeEl = f.elements.namedItem('distributionTime') as HTMLInputElement;
+                  if (!slotsEl || !dayEl || !timeEl) return;
+                  const slots = parseInt(slotsEl.value) || 1;
+                  handleApprove(selected.id, { approvedSlots: slots,
+                    distributionDay: dayEl.value,
+                    distributionTime: timeEl.value }); }} className="space-y-3">
                   <Input label="Approved Slots" name="approvedSlots" type="number" defaultValue={selected.requestedSlots} min={1} />
                   <Select label="Collection Day" name="distributionDay" options={[
                     { value: 'DAY_10', label: '10th Zulhijjah' }, { value: 'DAY_11', label: '11th Zulhijjah' }, { value: 'DAY_12', label: '12th Zulhijjah' }]} />
                   <Input label="Collection Time" name="distributionTime" placeholder="e.g., 08:00 - 12:00" />
+                  <Input label="Rejection Reason" value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} placeholder="Reason for rejection..." />
                   <div className="flex gap-3">
                     <Button type="submit" loading={actionLoading}>Approve</Button>
-                    <Button type="button" variant="danger" loading={actionLoading} onClick={() => { const r = prompt('Rejection reason:'); if (r) handleReject(selected.id, r); }}>Reject</Button>
+                    <Button type="button" variant="danger" loading={actionLoading} onClick={() => { if (rejectReason.trim()) handleReject(selected.id, rejectReason); }}>Reject</Button>
                   </div>
                 </form>
               </div>

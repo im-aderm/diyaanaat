@@ -6,6 +6,7 @@ import { CreateUserDto, UpdateUserDto, AssignCentersDto } from './dto/user.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
 
 @Controller('users')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -43,12 +44,12 @@ export class UsersController {
   }
 
   @Patch(':id/disable')
-  disable(@Param('id') id: string) {
-    return this.usersService.disable(id);
+  disable(@Param('id') id: string, @CurrentUser('id') userId: string) {
+    return this.usersService.disable(id, userId);
   }
 
   @Patch(':id/enable')
-  enable(@Param('id') id: string) {
-    return this.usersService.enable(id);
+  enable(@Param('id') id: string, @CurrentUser('id') userId: string) {
+    return this.usersService.enable(id, userId);
   }
 }

@@ -41,16 +41,43 @@ export class SessionsService {
     });
     if (existing) throw new ConflictException('Session for this year already exists');
 
-    return this.prisma.session.create({ data: dto });
+    return this.prisma.session.create({
+      data: {
+        name: dto.name,
+        gregorianYear: dto.gregorianYear,
+        hijriYear: dto.hijriYear,
+        registrationOpenDate: new Date(dto.registrationOpenDate),
+        registrationCloseDate: new Date(dto.registrationCloseDate),
+        distributionStartDate: new Date(dto.distributionStartDate),
+        distributionEndDate: new Date(dto.distributionEndDate),
+      },
+    });
   }
 
   async update(id: string, dto: UpdateSessionDto) {
     await this.findById(id);
-    return this.prisma.session.update({ where: { id }, data: dto });
+    const data: any = { ...dto };
+    if (dto.registrationOpenDate) data.registrationOpenDate = new Date(dto.registrationOpenDate);
+    if (dto.registrationCloseDate) data.registrationCloseDate = new Date(dto.registrationCloseDate);
+    if (dto.distributionStartDate) data.distributionStartDate = new Date(dto.distributionStartDate);
+    if (dto.distributionEndDate) data.distributionEndDate = new Date(dto.distributionEndDate);
+    return this.prisma.session.update({ where: { id }, data });
   }
 
   async updateStatus(id: string, status: SessionStatus) {
     const session = await this.findById(id);
+
+    const validTransitions: Record<string, string[]> = {
+      'DRAFT': ['REGISTRATION_OPEN'],
+      'REGISTRATION_OPEN': ['REGISTRATION_CLOSED'],
+      'REGISTRATION_CLOSED': ['DISTRIBUTION_ACTIVE'],
+      'DISTRIBUTION_ACTIVE': ['ARCHIVED'],
+      'ARCHIVED': [],
+    };
+
+    if (!validTransitions[session.status]?.includes(status)) {
+      throw new BadRequestException(`Cannot transition from ${session.status} to ${status}`);
+    }
 
     if (status === 'REGISTRATION_OPEN') {
       const existingActive = await this.prisma.session.findFirst({

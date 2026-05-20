@@ -9,14 +9,22 @@ export class CenterGuard implements CanActivate {
     const request = context.switchToHttp().getRequest();
     const user = request.user;
 
-    if (!user || user.role === 'SUPER_ADMIN') {
+    if (!user) {
+      throw new ForbiddenException('No authenticated user');
+    }
+
+    if (user.role === 'SUPER_ADMIN') {
       return true;
     }
 
-    const centerId = request.params?.centerId || request.body?.centerId || request.query?.centerId;
+    if (user.role !== 'CENTER_ADMIN') {
+      throw new ForbiddenException('Insufficient role');
+    }
+
+    const centerId = await this.resolveCenterId(request);
 
     if (!centerId) {
-      return true;
+      throw new ForbiddenException('Cannot determine resource center');
     }
 
     const userCenter = await this.prisma.userCenter.findFirst({
@@ -28,5 +36,38 @@ export class CenterGuard implements CanActivate {
     }
 
     return true;
+  }
+
+  private async resolveCenterId(request: any): Promise<string | null> {
+    const { params } = request;
+
+    if (params.centerId) {
+      const center = await this.prisma.center.findUnique({ where: { id: params.centerId }, select: { id: true } });
+      if (center) return center.id;
+      return null;
+    }
+
+    const resourceId = params.beneficiaryId || params.id;
+    if (!resourceId) return null;
+
+    const beneficiary = await this.prisma.beneficiary.findUnique({
+      where: { id: resourceId },
+      select: { centerId: true },
+    });
+    if (beneficiary) return beneficiary.centerId;
+
+    const cow = await this.prisma.cow.findUnique({
+      where: { id: resourceId },
+      select: { centerId: true },
+    });
+    if (cow) return cow.centerId;
+
+    const distribution = await this.prisma.distribution.findUnique({
+      where: { id: resourceId },
+      select: { beneficiary: { select: { centerId: true } } },
+    });
+    if (distribution?.beneficiary) return distribution.beneficiary.centerId;
+
+    return null;
   }
 }

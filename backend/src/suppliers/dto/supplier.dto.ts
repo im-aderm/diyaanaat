@@ -1,6 +1,4 @@
-import {
-  IsString, IsOptional, IsUUID,
-} from 'class-validator';
+import { IsString, IsOptional, IsUUID } from 'class-validator';
 
 export class CreateSupplierDto {
   @IsUUID('4')
@@ -42,6 +40,10 @@ export class UpdateSupplierDto {
   @IsOptional()
   @IsUUID('4')
   stateId?: string;
+
+  @IsOptional()
+  @IsUUID('4')
+  centerId?: string;
 
   @IsOptional()
   @IsString()

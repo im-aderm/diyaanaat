@@ -2,6 +2,7 @@ import {
   Injectable,
   UnauthorizedException,
   ConflictException,
+  Logger,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -11,6 +12,8 @@ import { LoginDto, CreateUserDto, RefreshTokenDto } from './dto/auth.dto';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
@@ -41,7 +44,7 @@ export class AuthService {
     const accessToken = this.jwtService.sign(payload);
     const refreshToken = this.jwtService.sign(payload, {
       secret: this.config.get<string>('jwt.refreshSecret'),
-      expiresIn: '7d' as const,
+      expiresIn: (this.config.get<string>('jwt.refreshExpiration') || '7d') as any,
     });
 
     const { passwordHash, ...userWithoutPassword } = user;
@@ -72,11 +75,12 @@ export class AuthService {
       const accessToken = this.jwtService.sign(newPayload);
       const refreshToken = this.jwtService.sign(newPayload, {
         secret: this.config.get<string>('jwt.refreshSecret'),
-        expiresIn: '7d' as const,
+        expiresIn: (this.config.get<string>('jwt.refreshExpiration') || '7d') as any,
       });
 
       return { accessToken, refreshToken };
-    } catch {
+    } catch (err: any) {
+      this.logger.warn(`Refresh token validation failed: ${err?.message || err}`);
       throw new UnauthorizedException('Invalid refresh token');
     }
   }

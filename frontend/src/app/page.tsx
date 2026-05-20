@@ -46,6 +46,7 @@ export default function LandingPage() {
   const [registerModal, setRegisterModal] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [resultData, setResultData] = useState<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -65,6 +66,13 @@ export default function LandingPage() {
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
+    const MAX_SIZE = 5 * 1024 * 1024;
+    for (const file of files) {
+      if (file.size > MAX_SIZE) {
+        setError(`File "${file.name}" exceeds 5MB limit`);
+        return;
+      }
+    }
     setSelectedFiles((prev) => [...prev, ...files]);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
@@ -78,7 +86,11 @@ export default function LandingPage() {
     setLoading(true);
     setError('');
     try {
-      const result: any = await api.post('/beneficiaries/register', form);
+      const submissionData = {
+        ...form,
+        phoneNumber: form.phoneNumber.startsWith('+') ? form.phoneNumber : `+234${form.phoneNumber}`,
+      };
+      const result: any = await api.post('/beneficiaries/register', submissionData);
       const beneficiaryId = result?.id;
 
       if (beneficiaryId && selectedFiles.length > 0) {
@@ -92,14 +104,15 @@ export default function LandingPage() {
         if (uploadResult?.errors?.length > 0) {
           console.warn('Some files failed to upload:', uploadResult.errors);
         }
-        setUploading(false);
       }
 
+      setResultData(result);
       setSuccess(true);
     } catch (err: any) {
-      setError(err.message || 'Registration failed.');
+      setError(err.message || 'Application failed.');
     } finally {
       setLoading(false);
+      setUploading(false);
     }
   };
 
@@ -130,17 +143,10 @@ export default function LandingPage() {
           <div className="flex items-center gap-3">
             <Link
               href="/login"
-              className="hidden sm:inline-flex items-center gap-1.5 text-sm font-medium text-on-surface-variant hover:text-primary transition-colors"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
-              Staff Login
-            </Link>
-            <button
-              onClick={() => setRegisterModal(true)}
               className="bg-primary text-on-primary px-5 py-2 rounded-lg text-sm font-medium hover:opacity-90 active:scale-95 transition-all"
             >
-              Register Now
-            </button>
+              Staff Login
+            </Link>
           </div>
         </div>
       </header>
@@ -164,7 +170,7 @@ export default function LandingPage() {
                 onClick={() => setRegisterModal(true)}
                 className="bg-primary text-on-primary px-8 py-4 rounded-lg text-base font-semibold hover:bg-primary-container transition-colors shadow-lg"
               >
-                Register for 2026 Distribution
+                Apply for 2026 Distribution
               </button>
               <a
                 href="#program"
@@ -180,17 +186,24 @@ export default function LandingPage() {
         <section id="program" className="py-section-gap px-4 md:px-container-padding-desktop">
           <div className="max-w-7xl mx-auto">
             <div className="grid grid-cols-1 md:grid-cols-12 gap-gutter">
-              <div className="md:col-span-8 bg-surface-container-low p-6 md:p-8 rounded-xl border border-outline-variant">
-                <span className="text-primary font-bold text-xs uppercase tracking-wider block mb-2">The Mission</span>
-                <h2 className="text-2xl md:text-3xl font-bold mb-4">The Religious &amp; Humanitarian Significance</h2>
+              <div className="md:col-span-8 bg-surface-container-lowest rounded-2xl border border-outline-variant p-6 md:p-8 shadow-sm hover:shadow-md transition-shadow group">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary-container/10 text-primary text-xs font-semibold tracking-wider uppercase mb-4">
+                  <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />The Mission
+                </div>
+                <h2 className="text-2xl md:text-3xl font-bold mb-4 text-on-surface group-hover:text-primary transition-colors">The Religious &amp; Humanitarian Significance</h2>
                 <p className="text-base text-on-surface-variant leading-relaxed">
                   The Qurbani Program is more than a logistical operation; it is a manifestation of religious devotion and communal solidarity. Under the supervision of the Türkiye Diyanet Foundation, we bridge the gap between donors and eligible recipients, ensuring that every contribution reaches its intended destination with dignity and transparency.
                 </p>
               </div>
-              <div className="md:col-span-4 bg-primary p-6 md:p-8 rounded-xl text-on-primary flex flex-col justify-center items-center text-center">
-                <ShieldCheck className="w-12 h-12 mb-4" />
-                <h3 className="text-xl font-semibold mb-2">Diyanet Supervised</h3>
-                <p className="text-sm opacity-90">Official oversight by the Türkiye Diyanet Foundation ensures ritual compliance and fair distribution across all regions.</p>
+              <div className="md:col-span-4 bg-primary rounded-2xl p-6 md:p-8 text-on-primary flex flex-col justify-center items-center text-center shadow-lg shadow-primary/20 relative overflow-hidden group cursor-default">
+                <div className="absolute inset-0 bg-gradient-to-br from-primary to-primary-container/80 opacity-50" />
+                <div className="relative z-10">
+                  <div className="w-16 h-16 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                    <ShieldCheck className="w-8 h-8" />
+                  </div>
+                  <h3 className="text-xl font-semibold mb-2">Diyanet Supervised</h3>
+                  <p className="text-sm opacity-90">Official oversight by the Türkiye Diyanet Foundation ensures ritual compliance and fair distribution across all regions.</p>
+                </div>
               </div>
             </div>
           </div>
@@ -200,8 +213,9 @@ export default function LandingPage() {
         <section id="process" className="bg-surface-container-lowest py-section-gap px-4 md:px-container-padding-desktop border-y border-outline-variant">
           <div className="max-w-7xl mx-auto">
             <div className="text-center mb-12 md:mb-16">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary-container/10 text-primary text-xs font-semibold tracking-wider uppercase mb-4">How It Works</div>
               <h2 className="text-2xl md:text-3xl font-bold mb-3">Seamless 4-Step Process</h2>
-              <p className="text-base text-on-surface-variant">Simple, transparent, and digitally managed for your convenience.</p>
+              <p className="text-base text-on-surface-variant max-w-lg mx-auto">Simple, transparent, and digitally managed for your convenience.</p>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-gutter">
               {[
@@ -211,11 +225,16 @@ export default function LandingPage() {
                 { step: 4, Icon: Truck, title: 'Collect', desc: 'Visit the assigned logistics center and present your token to collect your share.' },
               ].map(({ step, Icon, title, desc }) => (
                 <div key={step} className="relative group">
-                  <div className="bg-surface p-6 rounded-xl border border-outline-variant hover:border-primary transition-colors h-full">
-                    <div className="w-12 h-12 bg-primary-container text-on-primary rounded-full flex items-center justify-center mb-5 text-xl font-bold">{step}</div>
-                    <Icon className="w-8 h-8 text-primary mb-3" />
-                    <h4 className="text-lg font-semibold mb-2">{title}</h4>
-                    <p className="text-sm text-on-surface-variant">{desc}</p>
+                  <div className="bg-surface rounded-2xl p-6 border border-outline-variant hover:border-primary hover:shadow-lg hover:-translate-y-1 transition-all duration-300 h-full">
+                    <div className="flex items-center gap-3 mb-5">
+                      <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center text-on-primary text-lg font-bold shadow-md shadow-primary/20 group-hover:scale-110 transition-transform">{step}</div>
+                      <div className="h-px flex-1 bg-outline-variant/50 hidden sm:block" />
+                    </div>
+                    <div className="w-12 h-12 bg-primary-container/10 rounded-xl flex items-center justify-center mb-4 group-hover:bg-primary-container/20 transition-colors">
+                      <Icon className="w-6 h-6 text-primary" />
+                    </div>
+                    <h4 className="text-lg font-semibold mb-2 group-hover:text-primary transition-colors">{title}</h4>
+                    <p className="text-sm text-on-surface-variant leading-relaxed">{desc}</p>
                   </div>
                 </div>
               ))}
@@ -226,19 +245,25 @@ export default function LandingPage() {
         {/* ===== ELIGIBILITY ===== */}
         <section className="py-section-gap px-4 md:px-container-padding-desktop">
           <div className="max-w-7xl mx-auto">
-            <h2 className="text-2xl md:text-3xl font-bold mb-10 text-center">Eligibility Criteria</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div className="text-center mb-10">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary-container/10 text-primary text-xs font-semibold tracking-wider uppercase mb-4">Apply</div>
+              <h2 className="text-2xl md:text-3xl font-bold">Eligibility Criteria</h2>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
               {[
-                { Icon: Users, title: 'Vulnerable Families', desc: 'Households identified through national welfare databases as high-priority recipients.' },
-                { Icon: GraduationCap, title: 'Educational Support', desc: 'Students and educational institutions serving low-income communities.' },
-                { Icon: Building2, title: 'Registered NGOs', desc: 'Partner humanitarian organizations authorized to facilitate broader community reach.' },
-              ].map(({ Icon, title, desc }) => (
-                <div key={title} className="bg-surface-container-lowest p-6 md:p-8 rounded-xl border border-outline-variant shadow-sm hover:shadow-md transition-shadow">
-                  <div className="w-14 h-14 bg-surface-container flex items-center justify-center rounded-lg mb-6">
-                    <Icon className="w-6 h-6 text-primary" />
+                { Icon: Users, title: 'Vulnerable Families', desc: 'Households identified through national welfare databases as high-priority recipients.', color: 'from-primary/5 to-primary/10' },
+                { Icon: GraduationCap, title: 'Educational Support', desc: 'Students and educational institutions serving low-income communities.', color: 'from-secondary/5 to-secondary/10' },
+                { Icon: Building2, title: 'Registered NGOs', desc: 'Partner humanitarian organizations authorized to facilitate broader community reach.', color: 'from-tertiary/5 to-tertiary/10' },
+              ].map(({ Icon, title, desc, color }) => (
+                <div key={title} className={`relative bg-surface-container-lowest rounded-2xl border border-outline-variant p-6 md:p-8 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group overflow-hidden`}>
+                  <div className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl ${color} rounded-bl-full opacity-50 -mr-8 -mt-8 group-hover:scale-150 transition-transform duration-500`} />
+                  <div className="relative">
+                    <div className="w-14 h-14 bg-surface-container rounded-xl flex items-center justify-center mb-6 ring-1 ring-outline-variant/50 group-hover:ring-primary/30 group-hover:bg-primary-container/10 transition-all">
+                      <Icon className="w-6 h-6 text-primary group-hover:scale-110 transition-transform" />
+                    </div>
+                    <h3 className="text-lg font-semibold mb-3 group-hover:text-primary transition-colors">{title}</h3>
+                    <p className="text-sm text-on-surface-variant leading-relaxed">{desc}</p>
                   </div>
-                  <h3 className="text-lg font-semibold mb-3">{title}</h3>
-                  <p className="text-base text-on-surface-variant">{desc}</p>
                 </div>
               ))}
             </div>
@@ -280,12 +305,16 @@ export default function LandingPage() {
                 { q: 'What documents are required for registration?', a: 'You will need a valid government-issued ID, proof of residence, and if applicable, documents proving socioeconomic status (e.g., social welfare card).' },
                 { q: 'Is there a fee for registration?', a: 'Absolutely not. The Türkiye Diyanet Foundation Qurbani Program is a strictly humanitarian initiative. All services are free of charge.' },
               ].map(({ q, a }) => (
-                <details key={q} className="group bg-surface-container p-6 rounded-xl border border-outline-variant open:border-primary transition-all">
-                  <summary className="flex justify-between items-center cursor-pointer list-none font-semibold text-base">
-                    {q}
-                    <ChevronDown className="w-5 h-5 group-open:rotate-180 transition-transform text-on-surface-variant" />
+                <details key={q} className="group bg-surface-container-lowest rounded-2xl border border-outline-variant shadow-sm hover:shadow-md open:border-primary open:shadow-md transition-all duration-300">
+                  <summary className="flex justify-between items-center gap-4 cursor-pointer list-none font-semibold text-base p-6">
+                    <span className="group-open:text-primary transition-colors">{q}</span>
+                    <span className="w-8 h-8 rounded-lg bg-surface-container flex items-center justify-center shrink-0 group-open:bg-primary-container/20 group-open:text-primary transition-all">
+                      <ChevronDown className="w-5 h-5 group-open:rotate-180 transition-transform" />
+                    </span>
                   </summary>
-                  <p className="mt-4 text-base text-on-surface-variant">{a}</p>
+                  <div className="px-6 pb-6">
+                    <p className="text-sm text-on-surface-variant leading-relaxed">{a}</p>
+                  </div>
                 </details>
               ))}
             </div>
@@ -340,8 +369,8 @@ export default function LandingPage() {
             {/* Header */}
             <div className="sticky top-0 z-10 bg-surface-container-lowest rounded-t-2xl border-b border-outline-variant px-6 py-4 flex items-center justify-between backdrop-blur-sm">
               <div>
-                <h3 className="text-lg font-semibold text-on-surface">Beneficiary Registration</h3>
-                <p className="text-xs text-on-surface-variant">Qurbani {new Date().getFullYear()} / 1448 AH</p>
+                <h3 className="text-lg font-semibold text-on-surface">Beneficiary Application</h3>
+                <p className="text-xs text-on-surface-variant">Qurbani {new Date().getFullYear()} / 1448 AH &mdash; Application Form</p>
               </div>
               <button onClick={() => setRegisterModal(false)} className="text-on-surface-variant hover:text-on-surface bg-surface-container hover:bg-surface-container-high rounded-lg p-1.5 transition-colors">
                 <X className="w-5 h-5" />
@@ -353,24 +382,53 @@ export default function LandingPage() {
                 <div className="bg-error-container text-on-error-container rounded-xl p-4 mb-4 flex items-start gap-3">
                   <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5" />
                   <div>
-                    <p className="font-semibold text-sm">Registration is currently closed</p>
-                    <p className="text-xs opacity-80 mt-0.5">Please check back when the next session opens for registration.</p>
+                    <p className="font-semibold text-sm">Applications are currently closed</p>
+                    <p className="text-xs opacity-80 mt-0.5">Please check back when the next session opens for applications.</p>
                   </div>
                 </div>
               )}
 
               {success ? (
-                <div className="text-center py-10">
+                <div className="text-center py-6">
                   <div className="w-20 h-20 bg-tertiary-container rounded-full flex items-center justify-center mx-auto mb-5 ring-4 ring-tertiary-container/30">
                     <Check className="w-10 h-10 text-on-tertiary-container" />
                   </div>
-                  <p className="font-bold text-xl mb-1">Registration Submitted!</p>
-                  <p className="text-sm text-on-surface-variant mb-6 max-w-sm mx-auto">
-                    Your application has been received. You will get an SMS notification when it is reviewed.
+                  <p className="font-bold text-xl mb-1">Application Submitted!</p>
+                  <p className="text-sm text-on-surface-variant mb-4 max-w-sm mx-auto">
+                    Your application has been received. Save your application code below.
                   </p>
-                  <Link href="/status" className="text-primary text-sm font-semibold hover:underline inline-flex items-center gap-1">
-                    Check your status <ArrowUpRight className="w-3 h-3" />
-                  </Link>
+
+                  {/* Application Code Card */}
+                  <div id="print-receipt" className="bg-surface-container rounded-2xl border-2 border-dashed border-primary/30 p-5 mb-4 text-left">
+                    <div className="text-center mb-3">
+                      <img src="/logo.png" alt="Türkiye Diyanet Foundation" className="h-8 mx-auto" />
+                      <p className="text-xs text-on-surface-variant mt-1">Türkiye Diyanet Foundation &mdash; Qurbani {new Date().getFullYear()}</p>
+                    </div>
+                    <div className="bg-surface-container-lowest rounded-xl p-4 border border-outline-variant text-center mb-3">
+                      <p className="text-xs text-on-surface-variant font-medium tracking-wider uppercase mb-1">Your Application Code</p>
+                      <p className="text-2xl font-mono font-bold text-primary tracking-wider">{resultData?.uniqueCode || '---'}</p>
+                      <p className="text-xs text-on-surface-variant mt-1">Save this code to track your application</p>
+                    </div>
+                    <div className="text-xs text-on-surface-variant space-y-1 mb-3">
+                      <p><strong>Name:</strong> {form.fullName}</p>
+                      <p><strong>Phone:</strong> {form.phoneNumber}</p>
+                      <p><strong>Slots:</strong> {form.requestedSlots}</p>
+                      <p><strong>Submitted:</strong> {new Date().toLocaleDateString()}</p>
+                    </div>
+                    <p className="text-[10px] text-on-surface-variant/70 text-center">
+                      Present this code at your assigned center on collection day. You will receive an SMS when your application is reviewed.
+                    </p>
+                  </div>
+
+                  <div className="flex gap-3">
+                    <button onClick={() => window.print()} className="flex-1 bg-primary text-on-primary py-2.5 rounded-lg font-semibold text-sm hover:opacity-90 transition-all flex items-center justify-center gap-2">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
+                      Print Application Slip
+                    </button>
+                    <Link href="/status" className="flex-1 bg-surface-container-high text-on-surface py-2.5 rounded-lg font-semibold text-sm hover:bg-surface-container-highest transition-all flex items-center justify-center gap-2">
+                      Track Status <ArrowUpRight className="w-3 h-3" />
+                    </Link>
+                  </div>
                 </div>
               ) : (
                 <form onSubmit={handleSubmit} className="space-y-5">
@@ -562,7 +620,7 @@ export default function LandingPage() {
                           <div className="space-y-1.5">
                             <p className="text-xs font-medium text-on-surface-variant">{selectedFiles.length} file{selectedFiles.length > 1 ? 's' : ''} selected</p>
                             {selectedFiles.map((file, i) => (
-                              <div key={i} className="flex items-center justify-between bg-surface px-3 py-2 rounded-lg border border-outline-variant">
+                              <div key={`${file.name}-${file.size}-${i}`} className="flex items-center justify-between bg-surface px-3 py-2 rounded-lg border border-outline-variant">
                                 <div className="flex items-center gap-2 min-w-0">
                                   <Image className="w-4 h-4 text-primary shrink-0" />
                                   <span className="text-xs text-on-surface truncate">{file.name}</span>
@@ -584,14 +642,14 @@ export default function LandingPage() {
                     </div>
                   )}
 
-                  <button type="submit" disabled={loading}
+                  <button type="submit" disabled={loading || !registrationOpen}
                     className="w-full bg-primary text-on-primary py-3.5 rounded-xl font-semibold text-sm hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50 shadow-lg shadow-primary/20">
                     {loading || uploading ? (
                       <span className="inline-flex items-center gap-2">
                         <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
                         {uploading ? 'Uploading photos...' : 'Submitting...'}
                       </span>
-                    ) : 'Submit Registration'}
+                    ) : 'Submit Application'}
                   </button>
                 </form>
               )}

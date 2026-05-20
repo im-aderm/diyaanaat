@@ -77,22 +77,35 @@ export class UsersService {
   async assignCenters(userId: string, centerIds: string[]) {
     await this.findById(userId);
 
-    await this.prisma.userCenter.deleteMany({ where: { userId } });
-
-    if (centerIds.length > 0) {
-      await this.prisma.userCenter.createMany({
-        data: centerIds.map((centerId) => ({ userId, centerId })),
-      });
-    }
+    await this.prisma.$transaction([
+      this.prisma.userCenter.deleteMany({ where: { userId } }),
+      ...(centerIds.length > 0
+        ? [this.prisma.userCenter.createMany({
+            data: centerIds.map((centerId) => ({ userId, centerId })),
+          })]
+        : []),
+    ]);
 
     return this.findById(userId);
   }
 
-  async disable(id: string) {
-    return this.update(id, { isActive: false });
+  async disable(id: string, actorId: string) {
+    const result = await this.update(id, { isActive: false });
+
+    await this.prisma.auditLog.create({
+      data: { actorId, action: 'DISABLE_USER', entityType: 'User', entityId: id },
+    });
+
+    return result;
   }
 
-  async enable(id: string) {
-    return this.update(id, { isActive: true });
+  async enable(id: string, actorId: string) {
+    const result = await this.update(id, { isActive: true });
+
+    await this.prisma.auditLog.create({
+      data: { actorId, action: 'ENABLE_USER', entityType: 'User', entityId: id },
+    });
+
+    return result;
   }
 }

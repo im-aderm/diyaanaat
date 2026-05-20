@@ -23,8 +23,8 @@ export class UploadController {
     return this.uploadService.uploadFile(file, category, beneficiaryId, sessionYear);
   }
 
-  @Public()
   @Post('public')
+  @UseGuards(JwtAuthGuard)
   @UseInterceptors(FileInterceptor('file'))
   uploadPublicFile(
     @UploadedFile() file: Express.Multer.File,
@@ -35,8 +35,8 @@ export class UploadController {
     return this.uploadService.uploadFile(file, category, beneficiaryId, sessionYear);
   }
 
-  @Public()
   @Post('public/multiple')
+  @UseGuards(JwtAuthGuard)
   @UseInterceptors(FilesInterceptor('files', 5, { limits: { fileSize: 5242880 } }))
   uploadPublicMultipleFiles(
     @UploadedFiles() files: Express.Multer.File[],

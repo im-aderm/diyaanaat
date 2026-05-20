@@ -1,6 +1,6 @@
 import {
   Injectable, NotFoundException, ConflictException,
-  BadRequestException, Logger,
+  BadRequestException, Logger, ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import {
@@ -129,6 +129,8 @@ export class BeneficiariesService {
       if (existing) throw new ConflictException('This organization is already registered for this session');
     }
 
+    const code = await this.generateCodeWithRetry(center.center.code, activeSession.gregorianYear);
+
     const beneficiary = await this.prisma.beneficiary.create({
       data: {
         sessionId: activeSession.id,
@@ -146,6 +148,7 @@ export class BeneficiariesService {
         guarantorPhone: dto.guarantorPhone,
         requestedSlots: dto.requestedSlots,
         isFirstTime: dto.isFirstTime !== false,
+        uniqueCode: code,
       },
     });
 
@@ -165,30 +168,33 @@ export class BeneficiariesService {
       throw new BadRequestException('Only pending beneficiaries can be approved');
     }
 
-    const code = this.generateCode(beneficiary.center.code, beneficiary.session.gregorianYear);
+    await this.verifyCenterAccess(userId, beneficiary.centerId);
 
-    const updated = await this.prisma.beneficiary.update({
-      where: { id },
-      data: {
-        status: 'APPROVED',
-        approvedSlots: dto.approvedSlots,
-        distributionDay: dto.distributionDay,
-        distributionTime: dto.distributionTime,
-        uniqueCode: code,
-        approvedById: userId,
-        approvedAt: new Date(),
-      },
-    });
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const result = await tx.beneficiary.update({
+        where: { id },
+        data: {
+          status: 'APPROVED',
+          approvedSlots: dto.approvedSlots,
+          distributionDay: dto.distributionDay,
+          distributionTime: dto.distributionTime,
+          approvedById: userId,
+          approvedAt: new Date(),
+        },
+      });
 
-    await this.prisma.auditLog.create({
-      data: {
-        actorId: userId,
-        action: 'APPROVE',
-        entityType: 'Beneficiary',
-        entityId: id,
-        sessionId: beneficiary.sessionId,
-        centerId: beneficiary.centerId,
-      },
+      await tx.auditLog.create({
+        data: {
+          actorId: userId,
+          action: 'APPROVE',
+          entityType: 'Beneficiary',
+          entityId: id,
+          sessionId: beneficiary.sessionId,
+          centerId: beneficiary.centerId,
+        },
+      });
+
+      return result;
     });
 
     try {
@@ -207,24 +213,30 @@ export class BeneficiariesService {
       throw new BadRequestException('Only pending beneficiaries can be rejected');
     }
 
-    const updated = await this.prisma.beneficiary.update({
-      where: { id },
-      data: {
-        status: 'REJECTED',
-        rejectionReason: dto.rejectionReason,
-      },
-    });
+    await this.verifyCenterAccess(userId, beneficiary.centerId);
 
-    await this.prisma.auditLog.create({
-      data: {
-        actorId: userId,
-        action: 'REJECT',
-        entityType: 'Beneficiary',
-        entityId: id,
-        sessionId: beneficiary.sessionId,
-        centerId: beneficiary.centerId,
-        newValue: dto.rejectionReason,
-      },
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const result = await tx.beneficiary.update({
+        where: { id },
+        data: {
+          status: 'REJECTED',
+          rejectionReason: dto.rejectionReason,
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          actorId: userId,
+          action: 'REJECT',
+          entityType: 'Beneficiary',
+          entityId: id,
+          sessionId: beneficiary.sessionId,
+          centerId: beneficiary.centerId,
+          newValue: dto.rejectionReason,
+        },
+      });
+
+      return result;
     });
 
     try {
@@ -239,6 +251,8 @@ export class BeneficiariesService {
   async updateSlots(id: string, approvedSlots: number, userId: string) {
     const beneficiary = await this.findById(id);
     const oldSlots = beneficiary.approvedSlots;
+
+    await this.verifyCenterAccess(userId, beneficiary.centerId);
 
     const updated = await this.prisma.beneficiary.update({
       where: { id },
@@ -264,6 +278,32 @@ export class BeneficiariesService {
   private generateCode(centerCode: string, year: number): string {
     const shortYear = String(year).slice(-2);
     const random = uuidv4().slice(0, 5).toUpperCase();
-    return `QRB-${shortYear}-${centerCode}-${random}`;
+    return `APP-${shortYear}-${centerCode}-${random}`;
+  }
+
+  private async generateCodeWithRetry(centerCode: string, year: number): Promise<string> {
+    const maxRetries = 3;
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      const code = this.generateCode(centerCode, year);
+      try {
+        const existing = await this.prisma.beneficiary.findUnique({ where: { uniqueCode: code } });
+        if (!existing) return code;
+      } catch {
+        if (attempt === maxRetries - 1) throw new BadRequestException('Failed to generate unique code');
+      }
+    }
+    throw new BadRequestException('Failed to generate unique code after retries');
+  }
+
+  private async verifyCenterAccess(userId: string, centerId: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
+    if (user?.role === 'SUPER_ADMIN') return;
+
+    const userCenter = await this.prisma.userCenter.findFirst({
+      where: { userId, centerId },
+    });
+    if (!userCenter) {
+      throw new ForbiddenException('You do not have access to this center');
+    }
   }
 }

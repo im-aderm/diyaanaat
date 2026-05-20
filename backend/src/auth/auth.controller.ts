@@ -29,4 +29,11 @@ export class AuthController {
   getProfile(@CurrentUser('id') userId: string) {
     return this.authService.getProfile(userId);
   }
+
+  @Public()
+  @Post('logout')
+  @HttpCode(HttpStatus.OK)
+  logout() {
+    return { success: true };
+  }
 }

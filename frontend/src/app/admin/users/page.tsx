@@ -18,6 +18,7 @@ export default function UsersPage() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ email: '', fullName: '', password: '', role: 'CENTER_ADMIN' });
   const [formLoading, setFormLoading] = useState(false);
+  const [error, setError] = useState('');
   const pageSize = 20;
 
   const fetchUsers = useCallback(async () => {
@@ -27,9 +28,9 @@ export default function UsersPage() {
 
   useEffect(() => { fetchUsers(); }, [fetchUsers]);
 
-  const handleCreate = async (e: React.FormEvent) => { e.preventDefault(); setFormLoading(true); try { await api.post('/users', form); setShowForm(false); setForm({ email: '', fullName: '', password: '', role: 'CENTER_ADMIN' }); fetchUsers(); } finally { setFormLoading(false); } };
-  const handleDisable = async (id: string) => { await api.patch(`/users/${id}/disable`); fetchUsers(); };
-  const handleEnable = async (id: string) => { await api.patch(`/users/${id}/enable`); fetchUsers(); };
+  const handleCreate = async (e: React.FormEvent) => { e.preventDefault(); setFormLoading(true); try { await api.post('/users', form); setShowForm(false); setForm({ email: '', fullName: '', password: '', role: 'CENTER_ADMIN' }); fetchUsers(); } catch (err: any) { setError(err.message || 'Failed to create user'); } finally { setFormLoading(false); } };
+  const handleDisable = async (id: string) => { if (!window.confirm('Disable this user?')) return; try { await api.patch(`/users/${id}/disable`); fetchUsers(); } catch (err: any) { setError(err.message || 'Failed to disable user'); } };
+  const handleEnable = async (id: string) => { if (!window.confirm('Enable this user?')) return; try { await api.patch(`/users/${id}/enable`); fetchUsers(); } catch (err: any) { setError(err.message || 'Failed to enable user'); } };
 
   const columns = [
     { key: 'fullName', header: 'Name' }, { key: 'email', header: 'Email' },
@@ -43,6 +44,7 @@ export default function UsersPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between"><div><h1 className="text-2xl font-bold text-on-surface">Admin Users</h1><p className="text-on-surface-variant text-sm">Manage system administrators</p></div><Button onClick={() => setShowForm(true)}><Plus className="w-4 h-4 mr-2" />Add Admin</Button></div>
+      {error && <div className="bg-error-container text-on-error-container text-sm p-3 rounded-lg">{error}</div>}
       <Card>{loading ? <div className="flex justify-center py-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div> : <><Table columns={columns} data={users} /><Pagination page={page} total={total} pageSize={pageSize} onPageChange={setPage} /></>}</Card>
       <Modal open={showForm} onClose={() => setShowForm(false)} title="Create Admin User">
         <form onSubmit={handleCreate} className="space-y-4">

@@ -8,16 +8,17 @@ import {
 } from './dto/beneficiary.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
+import { CenterGuard } from '../common/guards/center.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { Public } from '../common/decorators/public.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 
 @Controller('beneficiaries')
+@UseGuards(JwtAuthGuard, RolesGuard, CenterGuard)
 export class BeneficiariesController {
   constructor(private beneficiariesService: BeneficiariesService) {}
 
   @Get()
-  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('SUPER_ADMIN', 'CENTER_ADMIN')
   findAll(
     @Query('skip') skip?: string,
@@ -48,7 +49,6 @@ export class BeneficiariesController {
   }
 
   @Get(':id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('SUPER_ADMIN', 'CENTER_ADMIN')
   findOne(@Param('id') id: string) {
     return this.beneficiariesService.findById(id);
@@ -61,7 +61,6 @@ export class BeneficiariesController {
   }
 
   @Patch(':id/approve')
-  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('SUPER_ADMIN', 'CENTER_ADMIN')
   approve(
     @Param('id') id: string,
@@ -72,7 +71,6 @@ export class BeneficiariesController {
   }
 
   @Patch(':id/reject')
-  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('SUPER_ADMIN', 'CENTER_ADMIN')
   reject(
     @Param('id') id: string,
@@ -83,7 +81,6 @@ export class BeneficiariesController {
   }
 
   @Patch(':id/slots')
-  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('SUPER_ADMIN', 'CENTER_ADMIN')
   updateSlots(
     @Param('id') id: string,

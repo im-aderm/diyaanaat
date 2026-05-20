@@ -31,11 +31,12 @@ export default function DashboardPage() {
   const { user } = useAuth();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     api.get<DashboardStats>('/reporting/dashboard')
       .then(setStats)
-      .catch(() => {})
+      .catch((err) => { setError(err.message || 'Failed to load dashboard data'); })
       .finally(() => setLoading(false));
   }, []);
 
@@ -43,12 +44,16 @@ export default function DashboardPage() {
     return <div className="flex justify-center py-16"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>;
   }
 
+  if (error) {
+    return <Card className="max-w-lg mx-auto mt-8"><p className="text-error">{error}</p></Card>;
+  }
+
   if (!stats) {
     return <Card className="max-w-lg mx-auto mt-8"><p className="text-on-surface-variant">No data available. Create a session first.</p></Card>;
   }
 
   const statCards = [
-    { label: 'Total Registrations', value: stats.beneficiaries.total, Icon: Users, color: 'bg-secondary-container text-on-secondary-container' },
+    { label: 'Total Applications', value: stats.beneficiaries.total, Icon: Users, color: 'bg-secondary-container text-on-secondary-container' },
     { label: 'Pending Review', value: stats.beneficiaries.pending, Icon: Clock, color: 'bg-yellow-100 text-yellow-800' },
     { label: 'Approved', value: stats.beneficiaries.approved, Icon: CheckCircle, color: 'bg-tertiary-container text-on-tertiary-container' },
     { label: 'Collected', value: stats.beneficiaries.collected, Icon: Package, color: 'bg-primary-container text-on-primary-container' },
@@ -82,12 +87,12 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card title="Collection Progress">
           <div className="text-center py-2">
-            <div className="text-3xl font-bold text-primary">{stats.beneficiaries.collectionRate}</div>
+            <div className="text-3xl font-bold text-primary">{parseFloat(stats.beneficiaries.collectionRate) || 0}%</div>
             <p className="text-sm text-on-surface-variant mt-1 flex items-center justify-center gap-1">
               <TrendingUp className="w-4 h-4" /> Collection Rate
             </p>
             <div className="mt-4 bg-surface-container rounded-full h-2">
-              <div className="bg-primary h-2 rounded-full transition-all" style={{ width: stats.beneficiaries.collectionRate }} />
+              <div className="bg-primary h-2 rounded-full transition-all" style={{ width: `${parseFloat(stats.beneficiaries.collectionRate) || 0}%` }} />
             </div>
           </div>
         </Card>

@@ -16,6 +16,7 @@ export default function SessionsPage() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ gregorianYear: new Date().getFullYear(), hijriYear: 1448, name: '', registrationOpenDate: '', registrationCloseDate: '', distributionStartDate: '', distributionEndDate: '' });
   const [formLoading, setFormLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const fetchSessions = useCallback(async () => {
     setLoading(true);
@@ -26,10 +27,12 @@ export default function SessionsPage() {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault(); setFormLoading(true);
-    try { await api.post('/sessions', form); setShowForm(false); fetchSessions(); } finally { setFormLoading(false); }
+    try { await api.post('/sessions', form); setShowForm(false); fetchSessions(); } catch (err: any) { setError(err.message || 'Failed to create session'); } finally { setFormLoading(false); }
   };
 
-  const handleStatusChange = async (id: string, status: string) => { await api.patch(`/sessions/${id}/status`, { status }); fetchSessions(); };
+  const handleStatusChange = async (id: string, status: string) => {
+    try { await api.patch(`/sessions/${id}/status`, { status }); fetchSessions(); } catch (err: any) { setError(err.message || 'Failed to change status'); }
+  };
 
   const sBadge = (s: string) => {
     switch (s) { case 'REGISTRATION_OPEN': return <Badge variant="success">Registration Open</Badge>; case 'REGISTRATION_CLOSED': return <Badge variant="warning">Closed</Badge>; case 'DISTRIBUTION_ACTIVE': return <Badge variant="info">Distribution Active</Badge>; case 'ARCHIVED': return <Badge variant="neutral">Archived</Badge>; default: return <Badge>{s}</Badge>; }
@@ -51,6 +54,7 @@ export default function SessionsPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between"><div><h1 className="text-2xl font-bold text-on-surface">Sessions</h1><p className="text-on-surface-variant text-sm">Manage yearly Qurbani sessions</p></div><Button onClick={() => setShowForm(true)}><Plus className="w-4 h-4 mr-2" />Create Session</Button></div>
+      {error && <div className="bg-error-container text-on-error-container text-sm p-3 rounded-lg">{error}</div>}
       <Card>{loading ? <div className="flex justify-center py-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div> : <Table columns={columns} data={sessions} />}</Card>
       <Modal open={showForm} onClose={() => setShowForm(false)} title="Create Session">
         <form onSubmit={handleCreate} className="space-y-4">

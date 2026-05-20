@@ -12,7 +12,7 @@ import Pagination from '@/components/ui/Pagination';
 import Modal from '@/components/ui/Modal';
 import { Beef, Plus } from 'lucide-react';
 
-interface Cow { id: string; tagNumber: string; status: string; estimatedYield: number | null; purchaseCost: number | null; purchaseDate: string | null; healthStatus: string | null; center: { name: string }; supplier: { name: string }; session: { name: string }; }
+interface Cow { id: string; tagNumber: string; status: string; estimatedYield: number | null; purchaseCost: number | null; purchaseDate: string | null; healthStatus: string | null; center: { id: string; name: string }; supplier: { id: string; name: string }; session: { id: string; name: string }; }
 
 const cowBadge = (status: string) => {
   switch (status) { case 'PURCHASED': return <Badge variant="info">Purchased</Badge>; case 'ASSIGNED': return <Badge variant="warning">Assigned</Badge>; case 'SLAUGHTERED': return <Badge variant="success">Slaughtered</Badge>; case 'DISTRIBUTED': return <Badge variant="success">Distributed</Badge>; default: return <Badge>{status}</Badge>; }
@@ -25,6 +25,10 @@ export default function InventoryPage() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ centerId: '', supplierId: '', sessionId: '', tagNumber: '', purchaseDate: '', purchaseCost: '', estimatedYield: '', healthStatus: '', notes: '' });
   const [formLoading, setFormLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [centers, setCenters] = useState<any[]>([]);
+  const [sessions, setSessions] = useState<any[]>([]);
+  const [suppliers, setSuppliers] = useState<any[]>([]);
   const pageSize = 20;
 
   const fetchData = useCallback(async () => {
@@ -37,18 +41,45 @@ export default function InventoryPage() {
     } finally { setLoading(false); }
   }, [page, statusFilter]);
 
+  const fetchDropdowns = useCallback(async () => {
+    try {
+      const [c, s, sup] = await Promise.all([
+        api.get<any[]>('/centers'),
+        api.get<any[]>('/sessions'),
+        api.get<{ data: any[] }>('/suppliers'),
+      ]);
+      setCenters(c || []);
+      setSessions(s || []);
+      setSuppliers((sup as any).data || sup || []);
+    } catch {}
+  }, []);
+
   useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => { fetchDropdowns(); }, []);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault(); setFormLoading(true);
     try {
-      await api.post('/cows', { ...form, purchaseCost: form.purchaseCost ? parseFloat(form.purchaseCost) : undefined, estimatedYield: form.estimatedYield ? parseInt(form.estimatedYield) : undefined });
+      const payload: any = {
+        centerId: form.centerId,
+        supplierId: form.supplierId,
+        sessionId: form.sessionId,
+        tagNumber: form.tagNumber || undefined,
+        purchaseDate: form.purchaseDate || undefined,
+        purchaseCost: form.purchaseCost ? parseFloat(form.purchaseCost) : undefined,
+        estimatedYield: form.estimatedYield ? parseInt(form.estimatedYield) : undefined,
+        healthStatus: form.healthStatus || undefined,
+        notes: form.notes || undefined,
+      };
+      await api.post('/cows', payload);
       setShowForm(false); fetchData();
+    } catch (err: any) {
+      setError(err.message || 'Failed to create cow');
     } finally { setFormLoading(false); }
   };
 
   const columns = [
-    { key: 'tagNumber', header: 'Tag' },
+    { key: 'tagNumber', header: 'Tag', render: (c: Cow) => c.tagNumber || '\u2014' },
     { key: 'status', header: 'Status', render: (c: Cow) => cowBadge(c.status) },
     { key: 'supplier', header: 'Supplier', render: (c: Cow) => c.supplier?.name || '\u2014' },
     { key: 'center', header: 'Center', render: (c: Cow) => c.center?.name || '\u2014' },
@@ -58,10 +89,7 @@ export default function InventoryPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div><h1 className="text-2xl font-bold text-on-surface">Cow Inventory</h1><p className="text-on-surface-variant text-sm">Manage cow inventory and track status</p></div>
-        <Button onClick={() => setShowForm(true)}><Plus className="w-4 h-4 mr-2" />Add Cow</Button>
-      </div>
+      <div className="flex items-center justify-between"><div><h1 className="text-2xl font-bold text-on-surface">Cow Inventory</h1><p className="text-on-surface-variant text-sm">Manage cow inventory and track status</p></div><Button onClick={() => setShowForm(true)}><Plus className="w-4 h-4 mr-2" />Add Cow</Button></div>
       <Card>
         <div className="flex gap-4 mb-4">
           <Select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
@@ -71,17 +99,30 @@ export default function InventoryPage() {
           <><Table columns={columns} data={data} /><Pagination page={page} total={total} pageSize={pageSize} onPageChange={setPage} /></>
         )}
       </Card>
+
       <Modal open={showForm} onClose={() => setShowForm(false)} title="Add New Cow">
         <form onSubmit={handleCreate} className="space-y-4">
-          <Input label="Tag Number" value={form.tagNumber} onChange={(e) => setForm({ ...form, tagNumber: e.target.value })} required />
-          <Input label="Supplier ID" value={form.supplierId} onChange={(e) => setForm({ ...form, supplierId: e.target.value })} required />
-          <Input label="Session ID" value={form.sessionId} onChange={(e) => setForm({ ...form, sessionId: e.target.value })} required />
-          <Input label="Center ID" value={form.centerId} onChange={(e) => setForm({ ...form, centerId: e.target.value })} required />
+          <Select label="Center *" value={form.centerId} onChange={(e) => setForm({ ...form, centerId: e.target.value })} required
+            options={[{ value: '', label: 'Select center...' }, ...centers.map((c: any) => ({ value: c.id, label: `${c.name} (${c.code})` }))]} />
+
+          <Select label="Session *" value={form.sessionId} onChange={(e) => setForm({ ...form, sessionId: e.target.value })} required
+            options={[{ value: '', label: 'Select session...' }, ...sessions.map((s: any) => ({ value: s.id, label: `${s.name} (${s.gregorianYear})` }))]} />
+
+          <Select label="Supplier *" value={form.supplierId} onChange={(e) => setForm({ ...form, supplierId: e.target.value })} required
+            options={[{ value: '', label: 'Select supplier...' }, ...suppliers.map((s: any) => ({ value: s.id, label: `${s.name} — ${s.center?.name || ''}` }))]} />
+
+          <Input label="Tag Number" value={form.tagNumber} onChange={(e) => setForm({ ...form, tagNumber: e.target.value })} placeholder="Optional — auto-generated if left empty" />
+
           <Input label="Purchase Date" type="date" value={form.purchaseDate} onChange={(e) => setForm({ ...form, purchaseDate: e.target.value })} />
-          <Input label="Purchase Cost" type="number" value={form.purchaseCost} onChange={(e) => setForm({ ...form, purchaseCost: e.target.value })} />
-          <Input label="Estimated Yield (portions)" type="number" value={form.estimatedYield} onChange={(e) => setForm({ ...form, estimatedYield: e.target.value })} />
-          <Input label="Health Status" value={form.healthStatus} onChange={(e) => setForm({ ...form, healthStatus: e.target.value })} />
-          <Button type="submit" loading={formLoading} className="w-full">Add Cow</Button>
+          <div className="grid grid-cols-2 gap-3">
+            <Input label="Purchase Cost (\u20A6)" type="number" value={form.purchaseCost} onChange={(e) => setForm({ ...form, purchaseCost: e.target.value })} />
+            <Input label="Est. Yield (portions)" type="number" value={form.estimatedYield} onChange={(e) => setForm({ ...form, estimatedYield: e.target.value })} />
+          </div>
+          <Input label="Health Status" value={form.healthStatus} onChange={(e) => setForm({ ...form, healthStatus: e.target.value })} placeholder="e.g., Healthy" />
+          <Input label="Notes" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Any additional notes" />
+
+          <Button type="submit" loading={formLoading} className="w-full"><Plus className="w-4 h-4 mr-2" />Add Cow</Button>
+          {error && <div className="bg-error-container text-on-error-container text-sm p-3 rounded-lg mt-3">{error}</div>}
         </form>
       </Modal>
     </div>

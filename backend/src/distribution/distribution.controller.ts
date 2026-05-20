@@ -5,12 +5,13 @@ import type { Request } from 'express';
 import { DistributionService } from './distribution.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
+import { CenterGuard } from '../common/guards/center.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { VerifyCodeDto, CollectDto } from '../beneficiaries/dto/beneficiary.dto';
 
 @Controller('distribution')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, CenterGuard)
 export class DistributionController {
   constructor(private distributionService: DistributionService) {}
 

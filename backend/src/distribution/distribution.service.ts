@@ -1,5 +1,5 @@
 import {
-  Injectable, NotFoundException, BadRequestException,
+  Injectable, NotFoundException, BadRequestException, ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
@@ -36,6 +36,8 @@ export class DistributionService {
       throw new BadRequestException('Distribution is not currently active');
     }
 
+    await this.verifyCenterAccess(userId, beneficiary.centerId);
+
     await this.auditService.log(userId, 'CODE_VERIFY_SUCCESS', 'Distribution', beneficiary.id, beneficiary.sessionId, beneficiary.centerId, ipAddress, true);
 
     return {
@@ -57,6 +59,7 @@ export class DistributionService {
   async collect(code: string, userId: string, ipAddress?: string) {
     const beneficiary = await this.prisma.beneficiary.findUnique({
       where: { uniqueCode: code },
+      include: { session: true },
     });
 
     if (!beneficiary) {
@@ -71,27 +74,41 @@ export class DistributionService {
       throw new BadRequestException('Already collected');
     }
 
-    const updated = await this.prisma.beneficiary.update({
-      where: { id: beneficiary.id },
-      data: {
-        collectedAt: new Date(),
-        collectedById: userId,
-      },
-    });
+    if (beneficiary.session.status !== 'DISTRIBUTION_ACTIVE') {
+      throw new BadRequestException('Distribution is not currently active');
+    }
 
-    await this.prisma.distribution.create({
-      data: {
-        beneficiaryId: beneficiary.id,
-        sessionId: beneficiary.sessionId,
-        code: code,
-        day: beneficiary.distributionDay!,
-        time: beneficiary.distributionTime!,
-        verifiedById: userId,
-        verifiedAt: new Date(),
-        collected: true,
-        collectedById: userId,
-        collectedAt: new Date(),
-      },
+    await this.verifyCenterAccess(userId, beneficiary.centerId);
+
+    if (!beneficiary.distributionDay || !beneficiary.distributionTime) {
+      throw new BadRequestException('Beneficiary has no assigned distribution day/time');
+    }
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const result = await tx.beneficiary.update({
+        where: { id: beneficiary.id },
+        data: {
+          collectedAt: new Date(),
+          collectedById: userId,
+        },
+      });
+
+      await tx.distribution.create({
+        data: {
+          beneficiaryId: beneficiary.id,
+          sessionId: beneficiary.sessionId,
+          code: code,
+          day: beneficiary.distributionDay!,
+          time: beneficiary.distributionTime!,
+          verifiedById: userId,
+          verifiedAt: new Date(),
+          collected: true,
+          collectedById: userId,
+          collectedAt: new Date(),
+        },
+      });
+
+      return result;
     });
 
     await this.auditService.log(userId, 'COLLECT', 'Distribution', beneficiary.id, beneficiary.sessionId, beneficiary.centerId, ipAddress, true);
@@ -121,5 +138,17 @@ export class DistributionService {
       remaining: total - collected,
       completionRate: total > 0 ? ((collected / total) * 100).toFixed(1) + '%' : '0%',
     };
+  }
+
+  private async verifyCenterAccess(userId: string, centerId: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
+    if (user?.role === 'SUPER_ADMIN') return;
+
+    const userCenter = await this.prisma.userCenter.findFirst({
+      where: { userId, centerId },
+    });
+    if (!userCenter) {
+      throw new ForbiddenException('You do not have access to this center');
+    }
   }
 }
