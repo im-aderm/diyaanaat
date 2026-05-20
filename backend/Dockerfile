@@ -1,10 +1,10 @@
 FROM node:24-alpine AS builder
 WORKDIR /app
 
-COPY backend/package*.json ./
+COPY package*.json ./
 RUN npm install
 
-COPY backend/ .
+COPY . .
 RUN npx prisma generate
 RUN npm run build
 
