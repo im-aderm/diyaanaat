@@ -1,10 +1,10 @@
 FROM node:24-alpine AS builder
 WORKDIR /app
 
-COPY backend/package*.json ./
-RUN npm install
+COPY package*.json ./
+RUN npm ci
 
-COPY backend/ .
+COPY . .
 RUN npx prisma generate
 RUN npm run build
 
@@ -23,6 +23,6 @@ RUN mkdir -p /app/uploads
 EXPOSE 3001
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-  CMD curl -f http://localhost:3001/api/v1/health || exit 1
+  CMD curl -f http://localhost:3001/health || exit 1
 
-CMD ["sh", "-c", "npx prisma migrate deploy; node dist/main"]
+CMD ["sh", "-c", "npx prisma migrate deploy && node dist/main.js"]
